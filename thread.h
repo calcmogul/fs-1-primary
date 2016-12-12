@@ -3,12 +3,14 @@
 #pragma once
 
 #include <atomic>
+#include <functional>
 
 #include "ch.hpp"
 
 /**
  * Wrapper class around ChibiOS dynamic threads
  */
+template <typename Function, typename... Args>
 class thread {
  public:
   thread() = default;
@@ -17,8 +19,7 @@ class thread {
   thread& operator=(const thread&) = delete;
   thread& operator=(thread&& rhs) noexcept;
 
-  template <class Function, class... Args>
-  thread(tprio_t priority, Function&& function, Args&&... args);
+  thread(tprio_t priority, Function&& func, Args&&... args);
 
   virtual ~thread();
 
@@ -34,7 +35,13 @@ class thread {
  private:
   thread_t* m_thread;
   THD_WORKING_AREA(m_workingArea, 128);
+  using Ret = typename std::result_of<Function&(Args...)>::type;
+  std::function<Ret()> m_func;
   std::atomic<bool> m_joinable{false};
 };
+
+template <typename Function, typename... Args>
+thread<Function, Args...> make_thread(tprio_t priority, Function&& func,
+                                      Args&&... args);
 
 #include "thread.inc"

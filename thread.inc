@@ -4,17 +4,17 @@
 
 #include <stdint.h>
 
-#include <functional>
-#include <memory>
 #include <utility>
 
 #include "hal.h"
 
-template <typename Callable>
-struct State {
-  explicit State(Callable&& f) : func(std::forward<Callable>(f)) {}
-  Callable func;
-};
+template <typename Function, typename... Args>
+thread<Function, Args...>::thread(thread&& rhs) noexcept {
+  m_thread = rhs.m_thread;
+  m_joinable = rhs.m_joinable.load();
+  rhs.m_thread = nullptr;
+  rhs.m_joinable = false;
+}
 
 /**
  * Create and launch a thread.
@@ -22,28 +22,75 @@ struct State {
  * @param function The address of the function to run as the new task.
  * @param args A parameter pack of arguments to pass to the function.
  */
-template <class Function, class... Args>
-thread::thread(tprio_t priority, Function&& func, Args&&... args) {
-  auto funcWrapper =
-      std::bind(std::forward<Function>(func), std::forward<Args>(args)...);
-  auto state =
-      std::make_unique<State<decltype(funcWrapper)>>(std::move(funcWrapper));
+template <typename Function, typename... Args>
+thread<Function, Args...>::thread(tprio_t priority, Function&& func,
+                                  Args&&... args) {
+  m_func = std::bind(std::forward<Function>(func), std::forward<Args>(args)...);
 
   const auto threadFunc = [](void* arg) {
-    auto state = reinterpret_cast<State<decltype(funcWrapper)>*>(arg);
-    state->func();
-    delete state;
+    auto state = reinterpret_cast<decltype(m_func)*>(arg);
+    (*state)();
   };
 
   m_thread = chThdCreateStatic(m_workingArea,
                                sizeof(m_workingArea),  // Stack size
-                               priority, threadFunc, state.get());
+                               priority, threadFunc, &m_func);
   if (m_thread == nullptr) {
     chSysHalt("Out of memory");
   }
 
-  // thread has taken control of memory
-  state.release();
-
   m_joinable = true;
+}
+
+template <typename Function, typename... Args>
+thread<Function, Args...>& thread<Function, Args...>::operator=(
+    thread&& rhs) noexcept {
+  m_thread = rhs.m_thread;
+  m_joinable = rhs.m_joinable.load();
+  rhs.m_thread = nullptr;
+  rhs.m_joinable = false;
+
+  return *this;
+}
+
+template <typename Function, typename... Args>
+thread<Function, Args...>::~thread() {
+  chThdRelease(m_thread);
+  if (m_joinable) {
+    m_joinable = false;
+  }
+}
+
+template <typename Function, typename... Args>
+bool thread<Function, Args...>::joinable() const noexcept {
+  return m_joinable;
+}
+
+template <typename Function, typename... Args>
+void thread<Function, Args...>::join() {
+  chThdWait(m_thread);
+}
+
+template <typename Function, typename... Args>
+void thread<Function, Args...>::detach() {
+  m_joinable = false;
+}
+
+template <typename Function, typename... Args>
+typename thread<Function, Args...>::id thread<Function, Args...>::get_id() const
+    noexcept {
+  return m_thread;
+}
+
+template <typename Function, typename... Args>
+typename thread<Function, Args...>::native_handle_type
+thread<Function, Args...>::native_handle() {
+  return m_thread;
+}
+
+template <typename Function, typename... Args>
+thread<Function, Args...> make_thread(tprio_t priority, Function&& func,
+                                      Args&&... args) {
+  return thread<Function, Args...>(priority, std::forward<Function>(func),
+                                   std::forward<Args>(args)...);
 }

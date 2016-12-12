@@ -59,16 +59,19 @@ int main() {
   CanBus canBus(0x680, CanBusBaudRate::k250k, true);
   chibios_rt::Mutex canBusMut;
 
-  thread heartbeatThread(NORMALPRIO + 3, heartbeatThreadFunc, canBus,
-                         canBusMut);
+  auto heartbeatThread =
+      make_thread(NORMALPRIO + 3, heartbeatThreadFunc, canBus, canBusMut);
 
-  thread inputProcThread(NORMALPRIO, inputProcThreadFunc, canBus, canBusMut);
+  auto inputProcThread =
+      make_thread(NORMALPRIO, inputProcThreadFunc, canBus, canBusMut);
 
   // Start receiver thread
-  thread canRxThread(NORMALPRIO + 7, canRxThreadFunc, canBus, canBusMut);
+  auto canRxThread =
+      make_thread(NORMALPRIO + 7, canRxThreadFunc, canBus, canBusMut);
 
   // Start transmitter thread
-  thread canTxThread(NORMALPRIO + 7, canTxThreadFunc, canBus, canBusMut);
+  auto canTxThread =
+      make_thread(NORMALPRIO + 7, canTxThreadFunc, canBus, canBusMut);
 
   while (1) {
     {
