@@ -18,7 +18,8 @@ class thread {
   thread& operator=(thread&& rhs) noexcept;
 
   template <class Function, class... Args>
-  thread(tprio_t priority, Function&& function, Args&&... args);
+  thread(stkalign_t* workingArea, size_t waSize, tprio_t priority,
+         Function&& function, Args&&... args);
 
   virtual ~thread();
 

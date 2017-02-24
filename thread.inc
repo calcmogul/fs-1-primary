@@ -23,7 +23,8 @@ struct State {
  * @param args A parameter pack of arguments to pass to the function.
  */
 template <class Function, class... Args>
-thread::thread(tprio_t priority, Function&& func, Args&&... args) {
+thread::thread(stkalign_t* workingArea, size_t waSize, tprio_t priority,
+               Function&& func, Args&&... args) {
   auto funcWrapper =
       std::bind(std::forward<Function>(func), std::forward<Args>(args)...);
   auto state =
@@ -35,9 +36,8 @@ thread::thread(tprio_t priority, Function&& func, Args&&... args) {
     delete state;
   };
 
-  m_thread = chThdCreateStatic(m_workingArea,
-                               sizeof(m_workingArea),  // Stack size
-                               priority, threadFunc, state.get());
+  m_thread =
+      chThdCreateStatic(workingArea, waSize, priority, threadFunc, state.get());
   if (m_thread == nullptr) {
     chSysHalt("Out of memory");
   }

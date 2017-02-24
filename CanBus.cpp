@@ -54,6 +54,8 @@ CanBus::CanBus(uint32_t id, CanBusBaudRate baud, bool loopback) {
 
   CANConfig config = MakeConfig(baud, loopback);
   canStart(&CAND1, &config);
+  palSetPadMode(GPIOA, 11, PAL_MODE_ALTERNATE(9));  // CAN RX
+  palSetPadMode(GPIOA, 12, PAL_MODE_ALTERNATE(9));  // CAN TX
 
   palWriteLine(LINE_LED_GREEN, PAL_LOW);
 }
